@@ -1,12 +1,7 @@
-//www.elegoo.com
-//2016.12.9
-
-//We always have to include the library
 #include "LedControl.h"
 
 /*
- Now we need a LedControl to work with.
- ***** These pin numbers will probably not work with your hardware *****
+ Initialize the LedControl Module
  pin 12 is connected to the DataIn 
  pin 11 is connected to LOAD(CS)
  pin 10 is connected to the CLK 
@@ -14,29 +9,30 @@
  */
 LedControl lc=LedControl(12,10,11,1);
 
-/* we always wait a bit between updates of the display */
-unsigned long delaytime1=500;
-unsigned long delaytime2=50;
-unsigned long delaytime3=300;
-
-// Arduino pin numbers
+// Pin numbers for the Joystick
 const int SW_pin = 2; // digital pin connected to switch output
 const int X_pin = 0; // analog pin connected to X output
 const int Y_pin = 1; // analog pin connected to Y output
 
+// Array holding the positions of the snake
 int snake[64][2] = { {0, 0}, {1, 0} };
+// index of the snake head in the snake array
 int snakeHead = 1;
+// index of the snake tail in the snake array
 int snakeTail = 0;
 
+// -1, 0, 1 number, showing the movement in the X axis
 int snakeMoveX = 1;
+// -1, 0, 1 number, showing the movement in the Y axis
 int snakeMoveY = 0;
 
+// position of the cherry that the snake can eat
 int cherry[2] = { 0, 0 };
 
-// lc.setLed(0, row, col, turnOn);
 void setup() {
-  randomSeed(analogRead(0));
+  randomSeed(analogRead(5));
 
+  // have a serial for debugging
   Serial.begin(9600);
   /*
    The MAX72XX is in power-saving mode on startup,
@@ -45,10 +41,17 @@ void setup() {
   lc.shutdown(0,false);
   /* Set the brightness to a medium values */
   lc.setIntensity(0,3);
-  /* and clear the display */
+  // start the game
   startGame();
 }
 
+/*
+ * Detects a move of the joystick and update
+ * the snakeMoveX and snakeMoveY variables. 
+ * The function allows to snake only to change its direction, 
+ * but not to move backward.
+ * Returns true, if a move from joystick was detected.
+ */
 bool detectMove() {
   int x = analogRead(X_pin);
   int y = analogRead(Y_pin);
@@ -74,7 +77,6 @@ bool detectMove() {
     moveY = -1;
   }
 
- 
   if (snakeMoveY != 0 && moveX != 0) {
     snakeMoveX = moveX;
     snakeMoveY = 0;
@@ -87,6 +89,10 @@ bool detectMove() {
   return false;
 }
 
+/*
+ * Generates a new cherry on a random position outside of the snake.
+ * The new cherry coordinates are stored in cherry variable.
+ */
 void generateCherry() {
   boolean generated = false;
   do {
@@ -110,6 +116,9 @@ void generateCherry() {
   Serial.println(cherry[1]);  
 }
 
+/*
+ * Starts a new game (initializes all variables)
+ */
 void startGame() {
   snakeMoveX = 1;
   snakeMoveY = 0;
@@ -124,6 +133,9 @@ void startGame() {
   generateCherry();
 }
 
+/*
+ * Restarts the game (show a cross and call startGame)
+ */
 void restartGame() {
   lc.setRow(0,0,B10000001);
   lc.setRow(0,1,B01000010);
@@ -138,7 +150,10 @@ void restartGame() {
   startGame();
 }
 
-
+/*
+ * Moves the snake - remove tail, add head.
+ * Also detects if the snake doesn't hit itself or when it eats a cherry.
+ */
 bool moveSnake() {
   
   int snakePoint[2] = { snake[snakeHead][0], snake[snakeHead][1] };
@@ -157,18 +172,20 @@ bool moveSnake() {
       return true;
     }
   }
+  // check if we have not eaten a cherry
   if (snake[snakeHead][0] != cherry[0] || snake[snakeHead][1] != cherry [1]) {
     snakeTail = (snakeTail + 1) % 64;
   } else {
-    // cherry was eaten, generate new cherry
+    // cherry was eaten, generate new cherry and don't move tail
     generateCherry();
   }
   return false;
   
 }
-// int snake[64][2] = { {0, 0}, {0, 1} };
-// int snakeHead = 1;
-// int snakeTail = 0;
+
+/*
+ * Draws the whole snake on the screen.
+ */
 void drawSnake() {
   for (int snakeIndex = snakeTail; snakeIndex != (snakeHead + 1) % 64; snakeIndex = (snakeIndex + 1) % 64) {
     int snakePoint[2] = { snake[snakeIndex][0], snake[snakeIndex][1] };
@@ -177,10 +194,14 @@ void drawSnake() {
   }
 }
 
+// Draws the cherry
 void drawCherry(bool on) {
   lc.setLed(0, cherry[0], cherry[1], on);
 }
 
+/*
+ * Main arduino loop
+ */
 void loop() {
 
   lc.clearDisplay(0);
@@ -190,10 +211,13 @@ void loop() {
     // if we have restarted, start the function over
     return;
   }
-  drawSnake();
   
+  drawSnake();
+
+  // detect if the user hasn't changed the direction
   bool moveMade = false;
   for (int i = 0; i < 5; i++) {
+    // make the cherry blink
     if (i == 3) {
       drawCherry(false);
     }
